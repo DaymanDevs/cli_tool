@@ -122,4 +122,4 @@ def main():
             search_tables_by_contract(combined_tables)
 
 if __name__ == "__main__":
-    main()
+    main() #test comment
