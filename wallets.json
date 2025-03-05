@@ -1,8 +1,8 @@
 {
     "Test Wallet 1": {
         "Mcap": {
-            "min": -Infinity,
-            "max": Infinity
+            "min": 6000.0,
+            "max": 25000.0
         },
         "Liq": {
             "min": -Infinity,
@@ -37,7 +37,8 @@
         },
         "Bundle": {
             "max": 0.05
-        }
+        },
+        "Targeted Feed": "Fomo"
     },
     "Test Wallet 1 dupe": {
         "Mcap": {

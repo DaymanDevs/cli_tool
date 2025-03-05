@@ -48,20 +48,20 @@ def load_and_combine_csv(directory):
             if col in df.columns:
                 df[col] = df[col].replace({'%': ''}, regex=True).astype(float) / 100
         if 'Multiples' in df.columns:
-            df['X\'s'] = df['Multiples'].replace({'x': ''}, regex=True).astype(float)
+            df['X\'s'] = pd.to_numeric(df['Multiples'].replace({'x': ''}, regex=True), errors='coerce')
             df = df.drop(columns=['Multiples'], errors='ignore')
         if 'HighestMcap' in df.columns:
-            df = df.rename(columns={'HighestMcap': 'MaxMcap'})
+            df['MaxMcap'] = pd.to_numeric(df['HighestMcap'], errors='coerce')
+            df = df.drop(columns=['HighestMcap'], errors='ignore')
         if 'Funding Time' in df.columns and 'Funding Source' in df.columns:
             df['Funding'] = df.apply(lambda row: f"{row['Funding Time']} ({row['Funding Source']})" if pd.notna(row['Funding Time']) and pd.notna(row['Funding Source']) else pd.NA, axis=1)
             df = df.drop(columns=['Funding Time', 'Funding Source'], errors='ignore')
         name = os.path.basename(file).split('-')[0].lower()
         tables.setdefault(name, []).append(df)
-        logging.debug(f"Loaded '{file}' into table '{name}' - {len(df)} rows")
-    
+        logging.debug(f"Loaded '{file}' into table '{name}' - {len(df)} rows, Columns: {df.columns.tolist()}")
+
     mcaps_df = load_mcaps_csv(directory)
     
-    # Collect ALL Top table data first
     top_tables = {key: df for key, df in tables.items() if key.endswith("10")}
     top_maxmcap = pd.DataFrame()
     for top_df_list in top_tables.values():
@@ -78,24 +78,20 @@ def load_and_combine_csv(directory):
     combined_tables = {}
     for name, dfs in tables.items():
         combined_df = pd.concat(dfs, ignore_index=True)
-        logging.debug(f"Processing table '{name}' - {len(combined_df)} rows initially")
+        logging.debug(f"Processing table '{name}' - {len(combined_df)} rows initially, Columns: {combined_df.columns.tolist()}")
         
         if name.endswith("10"):
-            if 'X\'s' in combined_df.columns:
-                combined_df['X\'s'] = combined_df['X\'s'].replace({'x': ''}, regex=True).astype(float)
-                combined_df = combined_df.drop_duplicates('Contract', keep='first')
-            # Top tables keep their MaxMcap and X's
-            logging.debug(f"Top table '{name}' processed - MaxMcap NaN count: {combined_df['MaxMcap'].isna().sum()}")
+            # Ensure Top tables retain their original MaxMcap and X's
+            combined_df = combined_df.drop_duplicates('Contract', keep='first')
+            logging.debug(f"Top table '{name}' processed - MaxMcap NaN count: {combined_df['MaxMcap'].isna().sum()}, X's NaN count: {combined_df['X\'s'].isna().sum()}")
         else:
             if name in ['pf', 'sm', 'gm']:
                 combined_df = combined_df.sort_values(["Date", "Time"], ascending=[False, False])
                 combined_df.insert(0, "Iteration", combined_df.groupby("Contract").cumcount() + 1)
                 combined_df = combined_df.reset_index(drop=True)
             
-            # Apply Top data first (highest priority)
             if not top_maxmcap.empty:
                 combined_df = combined_df.merge(top_maxmcap[['Contract', 'MaxMcap', 'X\'s']], on='Contract', how='left', suffixes=('', '_top'))
-                # Check if '_top' columns exist before accessing
                 if 'MaxMcap_top' in combined_df.columns:
                     combined_df['MaxMcap'] = combined_df['MaxMcap_top'].fillna(combined_df['MaxMcap'])
                     combined_df['X\'s'] = combined_df['X\'s_top'].fillna(combined_df['X\'s'])
@@ -107,7 +103,6 @@ def load_and_combine_csv(directory):
                 combined_df['MaxMcap'] = combined_df.get('MaxMcap', pd.NA)
                 combined_df['X\'s'] = combined_df.get('X\'s', pd.NA)
             
-            # Apply MCAPS only if no Top data
             if not mcaps_df.empty:
                 combined_df = combined_df.merge(mcaps_df, on='Contract', how='left', suffixes=('', '_mcaps'))
                 if 'MaxMcap_mcaps' in combined_df.columns:

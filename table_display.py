@@ -1,7 +1,7 @@
 from table_format import format_table_columns
-from table_utils import filter_table, generate_wallet_summary, search_contracts_in_pf
+from table_utils import filter_table, generate_wallet_summary, search_contracts_in_pf, generate_wallet_config_from_rows
 from ui_utils import menu_selection, print_filters, get_terminal_height
-from wallet_config import load_wallets, apply_wallet_config
+from wallet_config import load_wallets, apply_wallet_config, create_wallet_config, DEFAULT_CRITERIA
 from config import DATA_DIRECTORY
 import pandas as pd
 import platform
@@ -33,14 +33,16 @@ def display_table(table_name, combined_tables, display_name, search_results=None
             top_key = f"{base_name}10"
             top_df = combined_tables.get(top_key, pd.DataFrame())
             if not top_df.empty:
-                df = df.drop(columns=['MaxMcap', 'X\'s'], errors='ignore')
-                df = df.merge(top_df[['Contract', 'MaxMcap', 'X\'s']], on='Contract', how='left')
+                # Filter base df to only top_df contracts, then merge
+                df = df[df['Contract'].isin(top_df['Contract'])].merge(top_df[['Contract', 'MaxMcap', 'X\'s']], on='Contract', how='left', suffixes=('', '_top'))
+                df['MaxMcap'] = df['MaxMcap_top'].fillna(df['MaxMcap'])
+                df['X\'s'] = df['X\'s_top'].fillna(df['X\'s'])
+                df = df.drop(columns=[col for col in df.columns if col.endswith('_top')], errors='ignore')
     
     if 'Date' in df.columns and 'Time' in df.columns:
-        df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
-        df['Date'] = df.apply(lambda row: f"{row['Date'].strftime('%d/%m/%y %H:%M')}" if pd.notna(row['Date']) and pd.notna(row['Time']) else 
-                              f"{row['Date'].strftime('%d/%m/%y')}" if pd.notna(row['Date']) else pd.NA, axis=1)
-        df = df.drop(columns=['Time'])
+        df['Date'] = pd.to_datetime(df['Date'] + ' ' + df['Time'], errors='coerce')
+        df['Date'] = df['Date'].apply(lambda x: x.strftime('%d/%m/%y %H:%M') if pd.notna(x) else 'NaN')
+        df = df.drop(columns=['Time'], errors='ignore')
     if 'Funding' in df.columns:
         df = df.drop(columns=['FundTime', 'FundSource'], errors='ignore')
     
@@ -169,10 +171,10 @@ def display_table(table_name, combined_tables, display_name, search_results=None
                             menu_selection(wallet_options, table_str, info_message="Invalid selection. Press any key to continue...", middle_content=middle_content)
                             input()
                             continue
-                    from wallet_config import DEFAULT_CRITERIA
                     new_config = generate_wallet_config_from_rows(selected_df)
                     create_wallet_config(name, new_config)
-                    print(f"'{name}' created")
+                    print(f"'{name}' created")  # Placeholder; visual confirmation to be enhanced
+                    input("Press any key to continue...")
                     if platform.system() == "Windows":
                         os.system('cls')
                 
@@ -241,10 +243,9 @@ def search_tables_by_contract(combined_tables):
             feed_df = feed_df[feed_df['Contract'].isin(contracts)]
             if not feed_df.empty:
                 if 'Date' in feed_df.columns and 'Time' in feed_df.columns:
-                    feed_df['Date'] = pd.to_datetime(feed_df['Date'], errors='coerce')
-                    feed_df['Date'] = feed_df.apply(lambda row: f"{row['Date'].strftime('%d/%m/%y %H:%M')}" if pd.notna(row['Date']) and pd.notna(row['Time']) else 
-                                                    f"{row['Date'].strftime('%d/%m/%y')}" if pd.notna(row['Date']) else pd.NA, axis=1)
-                    feed_df = feed_df.drop(columns=['Time'])
+                    feed_df['Date'] = pd.to_datetime(feed_df['Date'] + ' ' + feed_df['Time'], errors='coerce')
+                    feed_df['Date'] = feed_df['Date'].apply(lambda x: x.strftime('%d/%m/%y %H:%M') if pd.notna(x) else 'NaN')
+                    feed_df = feed_df.drop(columns=['Time'], errors='ignore')
                 if 'Funding' in feed_df.columns:
                     feed_df = feed_df.drop(columns=['FundTime', 'FundSource'], errors='ignore')
                 if '#' not in feed_df.columns:

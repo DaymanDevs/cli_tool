@@ -3,7 +3,7 @@ from datetime import datetime
 from wallet_config import apply_wallet_config, DEFAULT_CRITERIA
 from data_loader import load_mcaps_csv
 from config import DATA_DIRECTORY
-from ui_utils import print_filters, menu_selection  # Added menu_selection
+from ui_utils import print_filters, menu_selection, format_filter_display
 from table_format import format_table_columns
 import colorama
 from colorama import Fore, Style
@@ -37,8 +37,8 @@ def filter_table(df, display_name, existing_filters=None):
         elif column == "Links":
             filtered_df = filtered_df[filtered_df[column] == value]
         elif column == "Funding":
+            min_val = value["min"]
             filtered_df['FundTimeHours'] = filtered_df['Funding'].apply(lambda x: convert_fundtime_to_hours(x.split(' (')[0]) if pd.notna(x) and '(' in x else float('nan'))
-            min_val = value["min"] if isinstance(value, dict) and "min" in value else float('-inf')
             filtered_df = filtered_df[filtered_df['FundTimeHours'] >= min_val].dropna(subset=['FundTimeHours'])
             filtered_df = filtered_df.drop(columns=['FundTimeHours'])
         elif column == "Bundle":
@@ -47,6 +47,9 @@ def filter_table(df, display_name, existing_filters=None):
         elif column == "DevBal":
             max_val = value["max"]
             filtered_df = filtered_df[filtered_df[column] <= max_val].dropna(subset=[column])
+        elif column == "X's":
+            min_val = value["min"]
+            filtered_df = filtered_df[filtered_df[column] >= min_val].dropna(subset=[column])
         else:
             min_val, max_val = value
             filtered_df = filtered_df[(filtered_df[column] >= min_val) & (filtered_df[column] <= max_val)].dropna(subset=[column])
@@ -141,6 +144,19 @@ def filter_table(df, display_name, existing_filters=None):
             elif column in filters:
                 del filters[column]
         
+        elif column == "X's":
+            min_val = menu_selection(filter_options, table_str, prompt="Enter minimum X's (or leave blank): ")
+            if min_val is None:
+                continue
+            if min_val:
+                try:
+                    filters[column] = {"min": float(min_val)}
+                except ValueError:
+                    menu_selection(filter_options, table_str, info_message="Invalid number format. Press any key to continue...")
+                    input()
+            elif column in filters:
+                del filters[column]
+        
         else:
             min_val = menu_selection(filter_options, table_str, prompt=f"Enter minimum {column} (or blank for no min): ")
             if min_val is None:
@@ -178,8 +194,8 @@ def filter_table(df, display_name, existing_filters=None):
             elif column == "Links":
                 filtered_df = filtered_df[filtered_df[column] == value]
             elif column == "Funding":
+                min_val = value["min"]
                 filtered_df['FundTimeHours'] = filtered_df['Funding'].apply(lambda x: convert_fundtime_to_hours(x.split(' (')[0]) if pd.notna(x) and '(' in x else float('nan'))
-                min_val = value["min"] if isinstance(value, dict) and "min" in value else float('-inf')
                 filtered_df = filtered_df[filtered_df['FundTimeHours'] >= min_val].dropna(subset=['FundTimeHours'])
                 filtered_df = filtered_df.drop(columns=['FundTimeHours'])
             elif column == "Bundle":
@@ -188,6 +204,9 @@ def filter_table(df, display_name, existing_filters=None):
             elif column == "DevBal":
                 max_val = value["max"]
                 filtered_df = filtered_df[filtered_df[column] <= max_val].dropna(subset=[column])
+            elif column == "X's":
+                min_val = value["min"]
+                filtered_df = filtered_df[filtered_df[column] >= min_val].dropna(subset=[column])
             else:
                 min_val, max_val = value
                 filtered_df = filtered_df[(filtered_df[column] >= min_val) & (filtered_df[column] <= max_val)].dropna(subset=[column])
@@ -281,6 +300,9 @@ def generate_wallet_config_from_rows(df):
             elif key == "Bundle":
                 max_val = df[key].max()
                 config[key]["max"] = float(max_val) if pd.notnull(max_val) else float('inf')
+            elif key == "X's":
+                min_val = df[key].min()
+                config[key]["min"] = float(min_val) if pd.notnull(min_val) else float('-inf')
             elif key == "Mcap":
                 max_val = df[key].max()
                 config[key]["max"] = int(round(max_val, -3)) if pd.notnull(max_val) else float('inf')
@@ -322,10 +344,9 @@ def search_contracts_in_pf(contracts, combined_tables, df):
         
         if not mcaps_df.empty:
             pf_df = pf_df.merge(mcaps_df, on='Contract', how='left', suffixes=('', '_mcaps'))
-            pf_df['MaxMcap'] = pf_df['MaxMcap'].fillna(pf_df.get('MaxMcap_mcaps', 0))
-            pf_df['X\'s'] = pf_df['MaxMcap'] / pf_df['Mcap']
-            pf_df['X\'s'] = pf_df['X\'s'].fillna(0).replace([float('inf'), -float('inf')], 0)
             if 'MaxMcap_mcaps' in pf_df.columns:
+                pf_df['MaxMcap'] = pf_df['MaxMcap'].fillna(pf_df['MaxMcap_mcaps'])
+                pf_df['X\'s'] = pf_df['X\'s'].fillna(pf_df['MaxMcap'] / pf_df['Mcap']).replace([float('inf'), -float('inf')], 0)
                 pf_df = pf_df.drop(columns=['MaxMcap_mcaps'])
         else:
             pf_df['MaxMcap'] = pf_df.get('MaxMcap', 0)

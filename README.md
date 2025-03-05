@@ -43,9 +43,8 @@ Install Dependencies:
 Requires Python 3.8+.
 
 Install required packages:
-bash
-
-pip install pandas colorama dune-client
+| ```bash
+| pip install pandas colorama dune-client
 
 Prepare Data:
 Place CSV files (e.g., fomo.csv, fomo10.csv, MCAPS-*.csv) in data/.
