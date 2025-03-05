@@ -1,0 +1,108 @@
+Here is our previous roadmap. We are almost done with Step 6. 
+
+Checklist and Roadmap (Based on features.txt)
+Completed Steps
+Step 1: Initial Setup and Structure (CHANGES)
+Achievements:
+CLI framework with main.py, data_loader.py, table_display.py, ui_utils.py, config.py.Loaded CSV files into tables ("fomo", "pf", etc.).Status: Complete.Step 2: Display Formatting and Export (CHANGES)
+Achievements:
+FundTime minutes displayed as "0h" (e.g., "25m" → "0h").Mcap, Liq, MaxMcap (formerly "HighestMcap") as dollar values (e.g., $15,396)."Export to CSV" implemented, saves to exports/ (e.g., table_export_20250228_1430.csv).Status: Complete.Step 3: MCAPS Integration (MCAPS)
+Achievements:
+Updated dune_fetcher.py to save MCAPS files with timestamps (e.g., MCAPS-20250227-1422.csv).Merged MCAPS into non-TOP tables ("fomo", "pf") with "MaxMcap" and "Multiples" (e.g., 6x for 60000/10000).Used highest max_market_cap_usd for duplicate MCAPS entries.Skipped TOP tables ("fomo10"), applied to "Search in PF" results.Set MaxMcap and Multiples to 0 when no MCAPS entry, filterable.Renamed "HighestMcap" to "MaxMcap" in TOP tables and "Search in PF".Added TOP fallback (e.g., $35,500, 2.6x for "CeBcvYkJ..." in "fomo").Status: Complete (confirmed by your "Fomo" table).Step 4: Middle Viewport (CHANGES)
+Achievements:
+Added middle viewport in ui_utils.py and table_display.py via middle_content.Placeholder ("Middle Viewport Placeholder\nLine 2 of Placeholder") persists across clicks.Status: Complete (you confirmed earlier).Step 5: Stabilization and Debugging
+Achievements:
+Fixed "Search in PF" iteration (oldest = 1, ascending).Added "Row Count" (e.g., "Row Count: 138").Implemented debug logging in debug.log.Status: Complete.Remaining Steps
+Step 6: Wallet Configs (WALLET CONFIGS)
+Objective: Add preset filter configurations ("Wallet Configs") for quick application.Tasks:
+Add "Wallets" menu option in main.py to manage configs (view, create, edit, delete).Create wallet_config.py to save configs in wallets.json with criteria (Mcap, Liq, etc.).Add "Apply Wallet Config" in display_table to append columns (e.g., "Config 1: buy", "Config 2: no: AG out of range").Add "Create Wallet Config" to generate configs from selected rows (e.g., min ranges from rows 1, 2, 3).Display summary stats in middle viewport (e.g., "Buys: 2", "2x: 2", "Highest Multiple: 178.5x").(Optional) Enable in-table config editing (defer if complex).Status: Not Started.Step 7: Strategies (STRATEGIES)
+Objective: Implement stop loss/take profit strategies for performance testing.Tasks:
+Add "Strategies" menu option in main.py to manage strategies in strategies.json.Create strategy_engine.py for strategy creation (e.g., "Buy: 1 Sol", "Stop Loss: -50%").Add "Apply Strategy" in display_table to append columns (e.g., "STRAT 1").Display strategy summary in middle viewport (e.g., "Spent: 4 Sol", "Return: 4 Sol").Status: Not Started.Step 8: Filename Refinement and Cleanup (CHANGES)
+Objective: Polish and finalize the tool.Tasks:
+Suggest better filenames (e.g., data_manager.py, ui_display.py).Remove debug logging from data_loader.py.Test all features end-to-end.Document usage in a README.Status: Not Started.
+
+
+---
+
+STRATEGIES feature outline
+
+As a final feature (for now), it would be handy to be able to create stop loss/take profit strategies and test them on our data. This means the user can create and edit strategies in the same way as wallet configs above, and then apply these to filtered unfiltered tables to see how that strategy would perform.
+
+An example use case would be testing a Wallet Config created from the Fomo table, then seeing how it looks with different Stop Loss Strategies.
+
+Here's what we need to achieve
+
+1) A new top-menu option called "Strategies", where I will be able to view/edit/delete existing strategies and create new ones.
+
+2) Strategies are created by specifying a "Buy" amount (numerical value to represent Sol (solana), decimals allowed. ie: 1 or 1.55) and as many stop loss/take profit steps as they wish. A strategy is valid as long as the total amount is equal to 100%. A user may also designate a "moonbag" amount, which is an amount they leave running and will make up part of the 100%.
+
+When setting up the strategy, for each step the user will be asked for a "Sell Amount" and a "Trade Position".
+
+For example, 2 different strategies might look like this:
+
+STRAT 1
+
+-Buy: 1 (sol)
+
+-Stop Loss 1
+--Sell Amount: 100%
+--Trade Position: -50%
+
+-Take Profit 1
+--Sell Amount: 50%
+--Trade Position: 100% 
+
+-Moonbag: 50%
+
+STRAT 2
+
+-Buy: 0.5 (sol)
+
+-Stop Loss 1
+--Sell Amount: 100%
+--Trade Position: -50%
+
+-Take Profit 1
+--Sell Amount: 50%
+--Trade Position: 100%
+
+-Take Profit 2
+--Sell Amount: 20%
+--Trade Position: 500%
+
+-Take Profit 3
+--Sell Amount: 20%
+--Trade Position: 1000%   
+
+-Moonbag: 10%
+
+---
+Note: "Trade Position" is the difference between the "mcap" in a table row and the position. For example if the MCAP of a token with a "buy" value is 10000 and it's multiples are 100x, Strat 2 would take profit at 2x (100%), 5x (500%) and 10x (1000%), satisfying all Take Profit steps and leaving a 10% moonbag.
+
+3) We will add a new menu item when displaying tables (filtered and unfiltered) called "Apply Strategy". This will present a numbered list of the existing "Strategies", which the user can select using comma separated values. Once applied, the displayed table will refresh with new columns to the right, with each column header named after each of the selected Strategies. For example, "STRAT 1", "STRAT 2" etc.
+
+This means a user could have an active filter, one or more wallet configs, and one or more strategies all applied to a table. The user should be able to modify which wallet configs and strategies are applied to the table without needing to refilter the table first.
+
+When applying one or more strategies, the user will be presented with a table summarising how the strategy/strategies would have performed for the currently displayed table.
+
+For example, if this was the filtered table and an applied wallet config results in all 4 being buys:
+
+Selection # Contract    Date       Time  Name     Mcap  Liq   AG Bundle FundTime FundSource Dev%    DevBal Links  F  KYC  Unq  SM  HighestMcap Multiples
+ 1           5k5XR8uN... 2025-02-26 06:40    KWAK 15396  8462 5    5.75%  2h      6aEpPQ      5.75% 30.0    Yes   3  1    3    0   2700000.0    178.5x
+ 2           9gk39UpM... 2025-02-26 00:30     SFG 15726  8700 3   10.34% 25m      BDhyEg     10.34%  3.5    Yes   6  2    4    0    107100.0      6.8x
+ 3           Cf2ARZED... 2025-02-26 16:17     MOE 11221  7126 4   10.00% 35m      39wS47     10.00%  3.3    Yes   2  1    2    1     65600.0      5.9x
+ 4           E1NRaCHZ... 2025-02-26 18:21    CONX 15117  8135 7    3.00% 20m      D52TSC      3.00%  7.5    Yes   2  1    2    1     66000.0      4.4x
+
+The user selects both Strat 1 and Strat 2 (taken from the examples above) to apply to the data. The output would be like so:
+
+STRAT 1
+Spent: 4 Sol (1 sol per buy)
+Return: 4 Sol (each token has a multiple of at least 2x, meaning it reached 100% profit (the Take Profit 1) and sold 50% of the new total)
+Unrealised: 191 Sol (the amount of profit unrealised after the total of each buy (1 sol) and all take profits are accounted for)
+
+STRAT 2
+Spent: 2 Sol
+Return: 4.5 Sol
+Unrealised: (calculate remaining value for each row after accounting for all Take Profit steps)
+
+NOTE: If entries are "buy" but the multiples is zero, we will assume the Stop Loss was hit. These will be added to the "return" as per each individual strategy.

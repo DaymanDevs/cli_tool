@@ -1,0 +1,14 @@
+{
+    "Strat 3:58": [
+        {
+            "type": "Stop Loss",
+            "pl_position": -50.0,
+            "tokens_to_sell": 100.0
+        },
+        {
+            "type": "Stop Loss",
+            "pl_position": 50.0,
+            "tokens_to_sell": 100.0
+        }
+    ]
+}

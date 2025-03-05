@@ -1,0 +1,363 @@
+{
+    "Test Wallet 1": {
+        "Mcap": {
+            "min": -Infinity,
+            "max": Infinity
+        },
+        "Liq": {
+            "min": -Infinity,
+            "max": Infinity
+        },
+        "AG": {
+            "min": 2.0,
+            "max": 10.0
+        },
+        "DevBal": {
+            "max": 35.6
+        },
+        "FundTime": {
+            "max": 1
+        },
+        "Links": null,
+        "F": {
+            "min": -Infinity,
+            "max": Infinity
+        },
+        "KYC": {
+            "min": -Infinity,
+            "max": Infinity
+        },
+        "Unq": {
+            "min": -Infinity,
+            "max": Infinity
+        },
+        "SM": {
+            "min": -Infinity,
+            "max": Infinity
+        },
+        "Bundle": {
+            "max": 0.05
+        }
+    },
+    "Test Wallet 1 dupe": {
+        "Mcap": {
+            "min": 10000.0,
+            "max": 20000.0
+        },
+        "Liq": {
+            "min": -Infinity,
+            "max": Infinity
+        },
+        "AG": {
+            "min": 2.0,
+            "max": 10.0
+        },
+        "DevBal": {
+            "max": 35.6
+        },
+        "FundTime": {
+            "max": 1
+        },
+        "Links": null,
+        "F": {
+            "min": -Infinity,
+            "max": Infinity
+        },
+        "KYC": {
+            "min": -Infinity,
+            "max": Infinity
+        },
+        "Unq": {
+            "min": -Infinity,
+            "max": Infinity
+        },
+        "SM": {
+            "min": -Infinity,
+            "max": Infinity
+        },
+        "Bundle": {
+            "max": 0.05
+        }
+    },
+    "auto created config": {
+        "Mcap": {
+            "min": 5000,
+            "max": 51000
+        },
+        "Liq": {
+            "min": 5000,
+            "max": 17000
+        },
+        "AG": {
+            "min": 3,
+            "max": 7
+        },
+        "DevBal": {
+            "max": 34.99
+        },
+        "FundTime": {
+            "max": 14
+        },
+        "Links": "Yes",
+        "F": {
+            "min": 2,
+            "max": 8
+        },
+        "KYC": {
+            "min": 0,
+            "max": 5
+        },
+        "Unq": {
+            "min": 2,
+            "max": 6
+        },
+        "SM": {
+            "min": 0,
+            "max": 1
+        },
+        "Bundle": {
+            "max": 0.519
+        }
+    },
+    "auto duped": {
+        "Mcap": {
+            "min": 5000,
+            "max": 51000
+        },
+        "Liq": {
+            "min": 5000,
+            "max": 17000
+        },
+        "AG": {
+            "min": 3,
+            "max": 7
+        },
+        "DevBal": {
+            "max": 34.99
+        },
+        "FundTime": {
+            "max": 14
+        },
+        "Links": "Yes",
+        "F": {
+            "min": 2,
+            "max": 8
+        },
+        "KYC": {
+            "min": 0,
+            "max": 5
+        },
+        "Unq": {
+            "min": 2,
+            "max": 6
+        },
+        "SM": {
+            "min": 0,
+            "max": 1
+        },
+        "Bundle": {
+            "max": 0.519
+        }
+    },
+    "wallet 1 dupe 2": {
+        "Mcap": {
+            "min": 10000.0,
+            "max": 20000.0
+        },
+        "Liq": {
+            "min": -Infinity,
+            "max": Infinity
+        },
+        "AG": {
+            "min": 2.0,
+            "max": 10.0
+        },
+        "DevBal": {
+            "max": 35.6
+        },
+        "FundTime": {
+            "max": 1
+        },
+        "Links": null,
+        "F": {
+            "min": -Infinity,
+            "max": Infinity
+        },
+        "KYC": {
+            "min": -Infinity,
+            "max": Infinity
+        },
+        "Unq": {
+            "min": -Infinity,
+            "max": Infinity
+        },
+        "SM": {
+            "min": -Infinity,
+            "max": Infinity
+        },
+        "Bundle": {
+            "max": 0.05
+        }
+    },
+    "great": {
+        "Mcap": {
+            "min": -Infinity,
+            "max": Infinity
+        },
+        "Liq": {
+            "min": -Infinity,
+            "max": Infinity
+        },
+        "AG": {
+            "min": 2.0,
+            "max": 10.0
+        },
+        "DevBal": {
+            "max": 35.6
+        },
+        "FundTime": {
+            "max": 1
+        },
+        "Links": null,
+        "F": {
+            "min": -Infinity,
+            "max": Infinity
+        },
+        "KYC": {
+            "min": -Infinity,
+            "max": Infinity
+        },
+        "Unq": {
+            "min": -Infinity,
+            "max": Infinity
+        },
+        "SM": {
+            "min": -Infinity,
+            "max": Infinity
+        },
+        "Bundle": {
+            "max": 0.05
+        }
+    },
+    "greater": {
+        "Mcap": {
+            "min": -Infinity,
+            "max": Infinity
+        },
+        "Liq": {
+            "min": -Infinity,
+            "max": Infinity
+        },
+        "AG": {
+            "min": 2.0,
+            "max": 10.0
+        },
+        "DevBal": {
+            "max": 35.6
+        },
+        "FundTime": {
+            "max": 1
+        },
+        "Links": null,
+        "F": {
+            "min": -Infinity,
+            "max": Infinity
+        },
+        "KYC": {
+            "min": -Infinity,
+            "max": Infinity
+        },
+        "Unq": {
+            "min": -Infinity,
+            "max": Infinity
+        },
+        "SM": {
+            "min": -Infinity,
+            "max": Infinity
+        },
+        "Bundle": {
+            "max": 0.05
+        }
+    },
+    "greatest": {
+        "Mcap": {
+            "min": -Infinity,
+            "max": Infinity
+        },
+        "Liq": {
+            "min": -Infinity,
+            "max": Infinity
+        },
+        "AG": {
+            "min": 2.0,
+            "max": 10.0
+        },
+        "DevBal": {
+            "max": 35.6
+        },
+        "FundTime": {
+            "max": 1
+        },
+        "Links": null,
+        "F": {
+            "min": -Infinity,
+            "max": Infinity
+        },
+        "KYC": {
+            "min": -Infinity,
+            "max": Infinity
+        },
+        "Unq": {
+            "min": -Infinity,
+            "max": Infinity
+        },
+        "SM": {
+            "min": -Infinity,
+            "max": Infinity
+        },
+        "Bundle": {
+            "max": 0.05
+        }
+    },
+    "testing again": {
+        "Mcap": {
+            "min": 6000.0,
+            "max": 80000.0
+        },
+        "Liq": {
+            "min": -Infinity,
+            "max": Infinity
+        },
+        "AG": {
+            "min": 2.0,
+            "max": 10.0
+        },
+        "DevBal": {
+            "max": 5.0
+        },
+        "FundTime": {
+            "max": 60
+        },
+        "Links": "Yes",
+        "F": {
+            "min": -Infinity,
+            "max": 2.0
+        },
+        "KYC": {
+            "min": -Infinity,
+            "max": Infinity
+        },
+        "Unq": {
+            "min": -Infinity,
+            "max": Infinity
+        },
+        "SM": {
+            "min": -Infinity,
+            "max": Infinity
+        },
+        "Bundle": {
+            "max": 0.55
+        },
+        "Feed": "PF"
+    }
+}

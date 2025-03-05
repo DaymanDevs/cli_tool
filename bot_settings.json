@@ -1,0 +1,11 @@
+{
+    "Newest Wallet": {
+        "MCAP Min": "2000"
+    },
+    "Filter test": {
+        "MCAP Min": "2500"
+    },
+    "hello": {
+        "MCAP Min": "1"
+    }
+}
