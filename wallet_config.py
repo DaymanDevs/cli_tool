@@ -1,7 +1,6 @@
 import json
 import os
-import pandas as pd  # Added import
-from config import DATA_DIRECTORY
+import pandas as pd
 from utils import convert_fundtime_to_hours
 
 DEFAULT_CRITERIA = {
@@ -9,7 +8,7 @@ DEFAULT_CRITERIA = {
     "Liq": {"min": float('-inf'), "max": float('inf')},
     "AG": {"min": float('-inf'), "max": float('inf')},
     "DevBal": {"max": float('inf')},
-    "Funding": {"min": 0},  # Updated to match wallets.json structure
+    "Funding": {"min": 0},
     "Bundle": {"max": float('inf')},
     "Links": None,
     "F": {"min": float('-inf'), "max": float('inf')},
@@ -17,19 +16,19 @@ DEFAULT_CRITERIA = {
     "Unq": {"min": float('-inf'), "max": float('inf')},
     "SM": {"min": float('-inf'), "max": float('inf')},
     "MaxMcap": {"min": float('-inf'), "max": float('inf')},
-    "X's": {"min": float('-inf'), "max": float('inf')},
+    "X's": {"min": float('-inf')},
     "Targeted Feed": "PF",
 }
 
 def load_wallets():
-    wallet_file = os.path.join(DATA_DIRECTORY, 'wallets.json')
+    wallet_file = 'wallets.json'  # Root directory
     if os.path.exists(wallet_file):
         with open(wallet_file, 'r') as f:
             return json.load(f)
     return {}
 
 def save_wallets(wallets):
-    wallet_file = os.path.join(DATA_DIRECTORY, 'wallets.json')
+    wallet_file = 'wallets.json'  # Root directory
     with open(wallet_file, 'w') as f:
         json.dump(wallets, f, indent=4)
 
@@ -49,45 +48,61 @@ def apply_wallet_config(df, config_name, criteria):
     decisions = []
     
     for _, row in df.iterrows():
-        decision = "skip"
+        decision = "buy"
         for key, value in criteria.items():
             if key == "Links":
                 if value is not None and row.get("Links") != value:
-                    decision = "skip"
+                    decision = f"{key} mismatch"
                     break
             elif key == "DevBal":
-                max_val = value["max"]
-                if max_val != float('inf') and (pd.isna(row.get("DevBal")) or row["DevBal"] > max_val):
-                    decision = "skip"
+                max_val = value.get("max", float('inf'))
+                col_value = row.get("DevBal", pd.NA)
+                if pd.isna(col_value) or col_value > max_val:
+                    decision = f"{key} too high"
                     break
             elif key == "Funding":
-                min_val = value["min"]
-                if min_val != 0 and (pd.isna(row.get("Funding")) or convert_fundtime_to_hours(row["Funding"].split(' (')[0]) < min_val):
-                    decision = "skip"
-                    break
+                min_val = value.get("min", 0)
+                max_val = value.get("max", float('inf'))
+                fund_time = row.get("Funding")
+                if pd.isna(fund_time):
+                    if min_val > 0 or max_val < float('inf'):
+                        decision = f"{key} missing"
+                        break
+                else:
+                    hours = convert_fundtime_to_hours(fund_time.split(' (')[0])
+                    if hours < min_val:
+                        decision = f"{key} too low"
+                        break
+                    elif hours > max_val:
+                        decision = f"{key} too high"
+                        break
             elif key == "Bundle":
-                max_val = value["max"]
-                if max_val != float('inf') and (pd.isna(row.get("Bundle")) or row["Bundle"] > max_val):
-                    decision = "skip"
+                max_val = value.get("max", float('inf'))
+                col_value = row.get("Bundle", pd.NA)
+                if pd.isna(col_value) or col_value > max_val:
+                    decision = f"{key} too high"
                     break
-            elif key in ["Mcap", "Liq", "MaxMcap", "X's"]:
-                min_val = value["min"]
-                max_val = value["max"]
+            elif key == "X's":
+                min_val = value.get("min", float('-inf'))
+                col_value = row.get("X's", pd.NA)
+                if pd.isna(col_value) or col_value < min_val:
+                    decision = f"{key} too low"
+                    break
+            elif key in ["Mcap", "Liq", "MaxMcap", "AG", "F", "KYC", "Unq", "SM"]:
+                min_val = value.get("min", float('-inf'))
+                max_val = value.get("max", float('inf'))
                 col_value = row.get(key, pd.NA)
-                if pd.isna(col_value) or col_value < min_val or col_value > max_val:
-                    decision = "skip"
+                if pd.isna(col_value):
+                    decision = f"{key} missing"
                     break
-            elif key in ["AG", "F", "KYC", "Unq", "SM"]:
-                min_val = value["min"]
-                max_val = value["max"]
-                col_value = row.get(key, pd.NA)
-                if pd.isna(col_value) or col_value < min_val or col_value > max_val:
-                    decision = "skip"
+                elif col_value < min_val:
+                    decision = f"{key} too low"
                     break
-        else:
-            decision = "buy"
-            if pd.notna(row.get("X's")) and row["X's"] == 0:
-                decision = "rug"
+                elif col_value > max_val:
+                    decision = f"{key} too high"
+                    break
+        if decision == "buy" and pd.notna(row.get("X's")) and row["X's"] == 0:
+            decision = "rug"
         decisions.append(decision)
     
     df[config_name] = decisions

@@ -2,85 +2,48 @@ import pandas as pd
 import colorama
 from colorama import Fore, Style
 
-def format_table_columns(df, applied_configs=None):
-    """Format table with column dividers, colors, and fixed widths to match the provided image."""
-    headers = list(df.columns)
+def format_table_columns(df, configs):
+    if df.empty:
+        return "No data available."
+    
+    headers = df.columns.tolist()
     column_widths = {
-        col: max(len(str(col)), df[col].apply(lambda x: len(str(x)) if pd.notnull(x) else 3).max() + 2)
-        for col in headers
+        '#': 4, 'Contract': 8, 'Date': 16, 'Name': 9, 'Mcap': 9, 'Liq': 9, 
+        'AG': 4, 'Bundle': 7, 'Dev%': 7, 'DevBal': 6, 'Links': 5, 'F': 4, 
+        'KYC': 4, 'Unq': 4, 'SM': 4, 'Funding': 14, 'MaxMcap': 11, 'X\'s': 6
     }
-    column_widths['Contract'] = 8  # 4 chars + "..."
-    column_widths['Bundle'] = 7  # e.g., "5.24%"
-    column_widths['Dev%'] = 7  # e.g., "5.24%"
-    column_widths['X\'s'] = 8  # e.g., "15.50x"
-    max_mcap_value = df['MaxMcap'].apply(lambda x: len(f"${int(round(x, 0)):,}") if pd.notnull(x) else 3).max()
-    column_widths['MaxMcap'] = max(8, min(12, max_mcap_value + 2))
-    for col in ['AG', 'F', 'KYC', 'Unq', 'SM']:
-        if col in column_widths:
-            column_widths[col] = 4
-    
-    formatted_lines = []
-    
-    header_line = " | ".join(f"{Fore.CYAN}{col:<{column_widths[col]}}{Style.RESET_ALL}" for col in headers)
-    formatted_lines.append(header_line)
-    formatted_lines.append("-" * (sum(column_widths.values()) + 3 * (len(headers) - 1)))
-    
-    for _, row in df.iterrows():
-        line = []
-        for col in headers:
-            if pd.isna(row[col]):
-                value = "NaN"
-                color = Fore.RED
-            else:
-                if col == 'Contract':
-                    value = f"{row[col][:4]}..."
-                elif col == 'Date':
-                    date_str = row[col]
-                    if isinstance(date_str, str) and " " in date_str:
-                        date_part, time_part = date_str.split(" ", 1)
-                        value = f"{date_part}{time_part}"
-                    else:
-                        value = date_str
-                elif col in ['Mcap', 'Liq', 'MaxMcap']:
-                    value = f"${int(round(float(row[col]) if pd.notnull(row[col]) else 0)):,.0f}"
-                elif col in ['Bundle', 'Dev%']:
-                    value = f"{float(row[col])*100:.2f}%" if pd.notnull(row[col]) else "NaN"
-                elif col == 'Funding':
-                    value = str(row[col])
-                elif col == 'X\'s':
-                    value = f"{float(row[col]):.2f}x" if pd.notnull(row[col]) else "0.00x"
-                elif col in ['DevBal', 'AG', 'F', 'KYC', 'Unq', 'SM']:
-                    try:
-                        num_val = float(row[col]) if pd.notnull(row[col]) else 0
-                        value = f"{num_val:.2f}" if col == 'DevBal' else f"{int(round(num_val))}"
-                    except (ValueError, TypeError):
-                        value = str(row[col])  # Fallback to string if conversion fails
-                else:
-                    value = str(row[col])
-                if applied_configs and col in applied_configs.keys():
-                    color = Fore.GREEN
-                else:
-                    color = get_column_color(col, row[col])
-            formatted = f"{color}{value:<{column_widths[col]}}{Style.RESET_ALL}"
-            line.append(formatted)
-        formatted_lines.append(" | ".join(line))
-    
-    return "\n".join(formatted_lines)
+    for config in configs or []:
+        column_widths[config] = max(8, len(config))
 
-def get_column_color(column, value):
-    """Assign colors based on column and value."""
-    if pd.isna(value):
-        return Fore.RED
-    if column in ['Mcap', 'Liq', 'MaxMcap']:
-        return Fore.GREEN if float(value) > 0 else Fore.RED
-    elif column in ['Bundle', 'Dev%']:
-        return Fore.YELLOW
-    elif column == 'Funding':
-        return Fore.WHITE
-    elif column == 'X\'s':
-        return Fore.GREEN if float(value) > 0 else Fore.RED
-    elif column in ['DevBal', 'Links', 'AG', 'F', 'KYC', 'Unq', 'SM']:
-        return Fore.WHITE
-    elif column == 'Contract':
-        return Fore.CYAN
-    return Fore.WHITE
+    formatted_rows = []
+    header_row = " | ".join(f"{Fore.CYAN}{header:<{column_widths.get(header, 10)}}{Style.RESET_ALL}" for header in headers)
+    formatted_rows.append(header_row)
+    formatted_rows.append("-" * (len(header_row)))
+
+    for _, row in df.iterrows():
+        formatted_row = []
+        for header in headers:
+            value = row.get(header, pd.NA)
+            if pd.isna(value):
+                formatted_value = "NaN"
+            elif header in ["Mcap", "Liq", "MaxMcap"]:
+                formatted_value = f"${value:,.0f}"
+                if len(formatted_value) > column_widths[header]:
+                    formatted_value = formatted_value[:column_widths[header]-1] + '+'
+            elif header == "X's":
+                formatted_value = f"{value:.2f}x"
+            elif header in ["Bundle", "Dev%"]:
+                formatted_value = f"{value*100:.2f}%"
+            elif header in ["AG", "F", "KYC", "Unq", "SM", "DevBal"]:
+                formatted_value = f"{value:.2f}" if header == "DevBal" else f"{value:.0f}"
+            else:
+                formatted_value = str(value)
+                if len(formatted_value) > column_widths[header]:
+                    formatted_value = formatted_value[:column_widths[header]-1] + '>'
+            if header in configs and value != "buy" and not pd.isna(value):
+                formatted_value = f"{Fore.RED}{formatted_value}{Style.RESET_ALL}"
+            formatted_row.append(f"{formatted_value:<{column_widths.get(header, 10)}}")
+        formatted_rows.append(" | ".join(formatted_row))
+    
+    return "\n".join(formatted_rows)
+
