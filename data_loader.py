@@ -61,7 +61,7 @@ def load_and_combine_csv(directory):
     
     mcaps_df = load_mcaps_csv(directory)
     
-    # Collect ALL Top table data first to prioritize it
+    # Collect ALL Top table data first
     top_tables = {key: df for key, df in tables.items() if key.endswith("10")}
     top_maxmcap = pd.DataFrame()
     for top_df_list in top_tables.values():
@@ -85,6 +85,7 @@ def load_and_combine_csv(directory):
                 combined_df['X\'s'] = combined_df['X\'s'].replace({'x': ''}, regex=True).astype(float)
                 combined_df = combined_df.drop_duplicates('Contract', keep='first')
             # Top tables keep their MaxMcap and X's
+            logging.debug(f"Top table '{name}' processed - MaxMcap NaN count: {combined_df['MaxMcap'].isna().sum()}")
         else:
             if name in ['pf', 'sm', 'gm']:
                 combined_df = combined_df.sort_values(["Date", "Time"], ascending=[False, False])
@@ -94,9 +95,13 @@ def load_and_combine_csv(directory):
             # Apply Top data first (highest priority)
             if not top_maxmcap.empty:
                 combined_df = combined_df.merge(top_maxmcap[['Contract', 'MaxMcap', 'X\'s']], on='Contract', how='left', suffixes=('', '_top'))
-                combined_df['MaxMcap'] = combined_df['MaxMcap_top'].fillna(combined_df['MaxMcap'])
-                combined_df['X\'s'] = combined_df['X\'s_top'].fillna(combined_df['X\'s'])
-                combined_df = combined_df.drop(columns=['MaxMcap_top', 'X\'s_top'], errors='ignore')
+                # Check if '_top' columns exist before accessing
+                if 'MaxMcap_top' in combined_df.columns:
+                    combined_df['MaxMcap'] = combined_df['MaxMcap_top'].fillna(combined_df['MaxMcap'])
+                    combined_df['X\'s'] = combined_df['X\'s_top'].fillna(combined_df['X\'s'])
+                    combined_df = combined_df.drop(columns=['MaxMcap_top', 'X\'s_top'], errors='ignore')
+                else:
+                    logging.debug(f"No 'MaxMcap_top' after merge for '{name}' - likely no matching contracts")
                 logging.debug(f"After TOP merge for '{name}' - MaxMcap NaN count: {combined_df['MaxMcap'].isna().sum()}")
             else:
                 combined_df['MaxMcap'] = combined_df.get('MaxMcap', pd.NA)
@@ -105,9 +110,10 @@ def load_and_combine_csv(directory):
             # Apply MCAPS only if no Top data
             if not mcaps_df.empty:
                 combined_df = combined_df.merge(mcaps_df, on='Contract', how='left', suffixes=('', '_mcaps'))
-                combined_df['MaxMcap'] = combined_df['MaxMcap'].fillna(combined_df['MaxMcap_mcaps'])
-                combined_df['X\'s'] = combined_df['X\'s'].fillna(combined_df['MaxMcap'] / combined_df['Mcap']).replace([float('inf'), -float('inf')], 0)
-                combined_df = combined_df.drop(columns=['MaxMcap_mcaps'], errors='ignore')
+                if 'MaxMcap_mcaps' in combined_df.columns:
+                    combined_df['MaxMcap'] = combined_df['MaxMcap'].fillna(combined_df['MaxMcap_mcaps'])
+                    combined_df['X\'s'] = combined_df['X\'s'].fillna(combined_df['MaxMcap'] / combined_df['Mcap']).replace([float('inf'), -float('inf')], 0)
+                    combined_df = combined_df.drop(columns=['MaxMcap_mcaps'], errors='ignore')
                 logging.debug(f"After MCAPS merge for '{name}' - MaxMcap NaN count: {combined_df['MaxMcap'].isna().sum()}")
             
             combined_df['MaxMcap'] = combined_df['MaxMcap'].fillna(0)
