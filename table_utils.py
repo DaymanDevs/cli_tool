@@ -61,7 +61,7 @@ def filter_table(df, display_name, existing_filters=None):
         ]
         
         table_str = f"{print_filters(filters)}\nRow Count: {len(filtered_df)}\n=== Data for {display_name.upper()} ===\n" + \
-                    format_table_columns(filtered_df, None)
+                    format_table_columns(filtered_df, [])
         choice = menu_selection(filter_options, table_str)
         if choice == "Back" or choice is None:
             break
@@ -329,7 +329,7 @@ def search_contracts_in_pf(contracts, combined_tables, df):
         print("\n=== Search Results in PF ===")
         print("No matching results found.")
     else:
-        pf_df = pf_df.sort_values(["Contract", "Date", "Time"], ascending=[True, True, True])
+        pf_df = pf_df.sort_values(["Contract", "Date"], ascending=[True, True])
         if "Iteration" in pf_df.columns:
             pf_df = pf_df.drop(columns=["Iteration"])
         pf_df.insert(0, "Iteration", pf_df.groupby("Contract").cumcount() + 1)
@@ -353,10 +353,9 @@ def search_contracts_in_pf(contracts, combined_tables, df):
             pf_df['X\'s'] = pf_df.get('X\'s', 0)
         
         print(f"\nRow Count: {len(pf_df)}\n=== Search Results in PF ===")
-        print(format_table_columns(pf_df))
+        print(format_table_columns(pf_df, []))
         prompt = menu_selection(["Go to PF", "Exit"], "Press Enter to go to PF, ESC to exit:")
         if prompt == "Go to PF":
-            from table_display import display_table
             display_table("pf", combined_tables, "PF", pf_df)
         else:
             print("\nPress any key to continue...")

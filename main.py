@@ -7,13 +7,17 @@ from config import DATA_DIRECTORY
 from ui_utils import menu_selection
 import platform
 import os
+import threading
 import colorama
 from colorama import Fore, Style
 
 colorama.init()
 
+def load_data_in_background(combined_tables):
+    combined_tables[0] = load_and_combine_csv(DATA_DIRECTORY)
+
 def manage_wallets(combined_tables):
-    wallets = load_wallets()  # Load wallets each time to ensure freshness
+    wallets = load_wallets()
     while True:
         wallet_table = format_wallet_table(wallets)
         if wallet_table is None:
@@ -46,8 +50,13 @@ def manage_wallets(combined_tables):
             edit_choice = menu_selection(wallet_options, table_str)
             if edit_choice == "Back" or edit_choice is None:
                 continue
-            if update_criteria(wallets[edit_choice], edit_choice, wallets.keys()):
+            result = update_criteria(wallets[edit_choice], edit_choice, wallets.keys())
+            if result is True:  # Save in place
                 save_wallets(wallets)
+            elif result:  # Save As with new name
+                wallet_name = result
+                wallets = load_wallets()  # Reload to get new wallet
+                update_criteria(wallets[wallet_name], wallet_name, wallets.keys())
         
         elif choice == "Duplicate Wallet":
             wallet_options = list(wallets.keys()) + ["Back"]
@@ -62,21 +71,21 @@ def manage_wallets(combined_tables):
                 input()
                 continue
             duplicate_wallet_config(dup_choice, new_name)
-            wallets = load_wallets()  # Reload to reflect changes
+            wallets = load_wallets()
         
         elif choice == "Delete Wallet":
             wallet_options = list(wallets.keys()) + ["Back"]
             del_choice = menu_selection(wallet_options, table_str)
             if del_choice == "Back" or del_choice is None:
                 continue
-            del wallets[del_choice]
-            save_wallets(wallets)
+            confirm = menu_selection(["Yes", "No"], f"Are you sure you want to delete '{del_choice}'?")
+            if confirm == "Yes":
+                del wallets[del_choice]
+                save_wallets(wallets)
 
 def main():
     if platform.system() == "Windows":
         os.system('cls')
-    
-    combined_tables = load_and_combine_csv(DATA_DIRECTORY)
     
     main_menu = ["Feeds", "Wallets", "Search by contract", "Exit"]
     feed_options = [
@@ -85,23 +94,38 @@ def main():
         "Back"
     ]
     
+    # Background loading
+    combined_tables = [None]  # List to share between threads
+    loading_thread = threading.Thread(target=load_data_in_background, args=(combined_tables,))
+    loading_thread.daemon = True  # Exit thread when main program exits
+    loading_thread.start()
+    
     while True:
         choice = menu_selection(main_menu, "=== MAIN MENU ===")
         if choice == "Exit" or choice is None:
             break
         
         if choice == "Feeds":
+            if combined_tables[0] is None:
+                print("Loading data, please wait...")
+                loading_thread.join()  # Wait for loading to finish
             feed_choice = menu_selection(feed_options, "=== FEEDS ===")
             if feed_choice == "Back" or feed_choice is None:
                 continue
             internal_key = feed_choice.lower().replace(" top", "")
-            display_table(internal_key, combined_tables, feed_choice)
+            display_table(internal_key, combined_tables[0], feed_choice)
         
         elif choice == "Wallets":
-            manage_wallets(combined_tables)
+            if combined_tables[0] is None:
+                print("Loading data, please wait...")
+                loading_thread.join()
+            manage_wallets(combined_tables[0])
         
         elif choice == "Search by contract":
-            search_tables_by_contract(combined_tables)
+            if combined_tables[0] is None:
+                print("Loading data, please wait...")
+                loading_thread.join()
+            search_tables_by_contract(combined_tables[0])
         
         if platform.system() == "Windows":
             os.system('cls')

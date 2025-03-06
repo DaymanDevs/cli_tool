@@ -33,14 +33,13 @@ def display_table(table_name, combined_tables, display_name, search_results=None
             top_key = f"{base_name}10"
             top_df = combined_tables.get(top_key, pd.DataFrame())
             if not top_df.empty:
-                # Filter base df to only top_df contracts, then merge
                 df = df[df['Contract'].isin(top_df['Contract'])].merge(top_df[['Contract', 'MaxMcap', 'X\'s']], on='Contract', how='left', suffixes=('', '_top'))
                 df['MaxMcap'] = df['MaxMcap_top'].fillna(df['MaxMcap'])
                 df['X\'s'] = df['X\'s_top'].fillna(df['X\'s'])
                 df = df.drop(columns=[col for col in df.columns if col.endswith('_top')], errors='ignore')
     
     if 'Date' in df.columns and 'Time' in df.columns:
-        df['Date'] = pd.to_datetime(df['Date'] + ' ' + df['Time'], errors='coerce')
+        df['Date'] = pd.to_datetime(df['Date'] + ' ' + df['Time'], errors='coerce', dayfirst=True)
         df['Date'] = df['Date'].apply(lambda x: x.strftime('%d/%m/%y %H:%M') if pd.notna(x) else 'NaN')
         df = df.drop(columns=['Time'], errors='ignore')
     if 'Funding' in df.columns:
@@ -173,7 +172,7 @@ def display_table(table_name, combined_tables, display_name, search_results=None
                             continue
                     new_config = generate_wallet_config_from_rows(selected_df)
                     create_wallet_config(name, new_config)
-                    print(f"'{name}' created")  # Placeholder; visual confirmation to be enhanced
+                    print(f"'{name}' created")
                     input("Press any key to continue...")
                     if platform.system() == "Windows":
                         os.system('cls')
@@ -243,15 +242,19 @@ def search_tables_by_contract(combined_tables):
             feed_df = feed_df[feed_df['Contract'].isin(contracts)]
             if not feed_df.empty:
                 if 'Date' in feed_df.columns and 'Time' in feed_df.columns:
-                    feed_df['Date'] = pd.to_datetime(feed_df['Date'] + ' ' + feed_df['Time'], errors='coerce')
+                    feed_df['Date'] = pd.to_datetime(feed_df['Date'] + ' ' + feed_df['Time'], errors='coerce', dayfirst=True)
                     feed_df['Date'] = feed_df['Date'].apply(lambda x: x.strftime('%d/%m/%y %H:%M') if pd.notna(x) else 'NaN')
                     feed_df = feed_df.drop(columns=['Time'], errors='ignore')
+                feed_df = feed_df.sort_values(["Date"], ascending=[True])
+                if 'Iteration' in feed_df.columns:
+                    feed_df = feed_df.drop(columns=["Iteration"])
+                feed_df.insert(0, "Iteration", feed_df.groupby("Contract").cumcount() + 1)
+                feed_df = feed_df.reset_index(drop=True)
                 if 'Funding' in feed_df.columns:
                     feed_df = feed_df.drop(columns=['FundTime', 'FundSource'], errors='ignore')
                 if '#' not in feed_df.columns:
                     feed_df.insert(0, "#", range(1, len(feed_df) + 1))
                 results[feed] = feed_df
-            menu_selection(["Continue"], f"\n=== Results for {feed.upper()} ===\n" + format_table_columns(feed_df), info_message="Press any key to continue...")
         except KeyError:
             print(f"Warning: Feed '{feed}' not found in combined_tables. Skipping...")
             continue
@@ -261,15 +264,18 @@ def search_tables_by_contract(combined_tables):
         input()
         return
     
+    combined_output = []
     for feed, feed_df in results.items():
-        print(f"\n=== Results for {feed.upper()} ===\n")
-        print(format_table_columns(feed_df))
-        prompt = menu_selection(["Go to PF", "Exit"], "Press Enter to go to PF, ESC to exit:")
-        if prompt == "Go to PF":
-            display_table("pf", combined_tables, "PF", results.get("PF", pd.DataFrame()))
+        combined_output.append(f"Row Count: {len(feed_df)}\n=== Results for {feed.upper()} ===\n{format_table_columns(feed_df, [])}")
+    print("\n\n".join(combined_output))
+    prompt = menu_selection(["Go to PF", "Go to SM", "Exit"], "Press Enter to go to PF, S for SM, ESC to exit:")
+    if prompt == "Go to PF":
+        display_table("pf", combined_tables, "PF", results.get("PF", pd.DataFrame()))
+    elif prompt == "Go to SM":
+        display_table("sm", combined_tables, "SM", results.get("SM", pd.DataFrame()))
+    else:
+        print("\nPress any key to continue...")
+        if platform.system() == "Windows":
+            msvcrt.getch()
         else:
-            print("\nPress any key to continue...")
-            if platform.system() == "Windows":
-                msvcrt.getch()
-            else:
-                curses.wrapper(lambda stdscr: stdscr.getch())
+            curses.wrapper(lambda stdscr: stdscr.getch())
