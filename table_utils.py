@@ -1,7 +1,7 @@
 import pandas as pd
 from datetime import datetime
 from wallet_config import apply_wallet_config, DEFAULT_CRITERIA
-from data_loader import load_mcaps_csv
+from data_loader import load_mcaps_db
 from config import DATA_DIRECTORY
 from ui_utils import print_filters, menu_selection, format_filter_display
 from table_format import format_table_columns
@@ -317,20 +317,20 @@ def generate_wallet_config_from_rows(df):
                     config[key]["max"] = int(round(max_val)) if pd.notnull(max_val) else float('inf')
     return config
 
-def search_contracts_in_pf(contracts, combined_tables, df):
-    if "pf" not in combined_tables:
-        print("PF table not found.")
+def search_contracts_in_pf(contracts, conn, df):
+    if conn is None:
+        print("Error: Database connection failed.")
         return
     
-    mcaps_df = load_mcaps_csv(DATA_DIRECTORY)
-    
-    pf_df = combined_tables["pf"][combined_tables["pf"]["Contract"].isin(contracts)]
+    mcaps_df = load_mcaps_db(conn)
+    query = f"SELECT * FROM pf WHERE Contract IN ({','.join(['?' for _ in contracts])})"
+    pf_df = pd.read_sql_query(query, conn, params=contracts)
     if pf_df.empty:
         print("\n=== Search Results in PF ===")
         print("No matching results found.")
     else:
         pf_df = pf_df.sort_values(["Contract", "Date"], ascending=[True, True])
-        if "Iteration" in pf_df.columns:
+        if 'Iteration' in pf_df.columns:
             pf_df = pf_df.drop(columns=["Iteration"])
         pf_df.insert(0, "Iteration", pf_df.groupby("Contract").cumcount() + 1)
         pf_df = pf_df.reset_index(drop=True)
@@ -347,16 +347,16 @@ def search_contracts_in_pf(contracts, combined_tables, df):
             if 'MaxMcap_mcaps' in pf_df.columns:
                 pf_df['MaxMcap'] = pf_df['MaxMcap'].fillna(pf_df['MaxMcap_mcaps'])
                 pf_df['X\'s'] = pf_df['X\'s'].fillna(pf_df['MaxMcap'] / pf_df['Mcap']).replace([float('inf'), -float('inf')], 0)
-                pf_df = pf_df.drop(columns=['MaxMcap_mcaps'])
-        else:
-            pf_df['MaxMcap'] = pf_df.get('MaxMcap', 0)
-            pf_df['X\'s'] = pf_df.get('X\'s', 0)
+                pf_df = pf_df.drop(columns=['MaxMcap_mcaps'], errors='ignore')
+            else:
+                pf_df['MaxMcap'] = pf_df.get('MaxMcap', pd.NA)
+                pf_df['X\'s'] = pf_df.get('X\'s', 0)
         
         print(f"\nRow Count: {len(pf_df)}\n=== Search Results in PF ===")
         print(format_table_columns(pf_df, []))
         prompt = menu_selection(["Go to PF", "Exit"], "Press Enter to go to PF, ESC to exit:")
         if prompt == "Go to PF":
-            display_table("pf", combined_tables, "PF", pf_df)
+            display_table("pf", conn, "PF", pf_df)
         else:
             print("\nPress any key to continue...")
             if platform.system() == "Windows":

@@ -8,6 +8,7 @@ def init_database():
     db_path = os.path.join(DATA_DIRECTORY, 'data.db')
     processed_file = os.path.join(DATA_DIRECTORY, 'processed_files.json')
     
+    # Load previously processed files
     processed_files = {}
     if os.path.exists(processed_file):
         with open(processed_file, 'r') as f:
@@ -38,6 +39,9 @@ def init_database():
         for file in new_csvs:
             feed_name = os.path.basename(file).split('-')[0].lower()
             df = pd.read_csv(file)
+            # Rename 'Contract' to 'token'
+            if 'Contract' in df.columns:
+                df = df.rename(columns={'Contract': 'token'})
             numeric_cols = ["Mcap", "Liq", "AG", "Dev Bal", "F", "KYC", "Unq", "SM"]
             for col in numeric_cols:
                 if col in df.columns:
@@ -46,9 +50,6 @@ def init_database():
             for col in percent_cols:
                 if col in df.columns:
                     df[col] = df[col].replace({'%': ''}, regex=True).astype(float) / 100
-            if 'Multiples' in df.columns:
-                df['X\'s'] = pd.to_numeric(df['Multiples'].replace({'x': ''}, regex=True), errors='coerce')
-                df = df.drop(columns=['Multiples'], errors='ignore')
             if 'HighestMcap' in df.columns:
                 df['MaxMcap'] = pd.to_numeric(df['HighestMcap'], errors='coerce')
                 df = df.drop(columns=['HighestMcap'], errors='ignore')
@@ -63,29 +64,31 @@ def init_database():
         
         if new_mcaps:
             mcaps_df = pd.concat([pd.read_csv(f) for f in new_mcaps], ignore_index=True)
-            existing_mcaps = pd.read_sql_query("SELECT Contract, MaxMcap FROM mcaps", conn) if 'mcaps' in pd.read_sql_query("SELECT name FROM sqlite_master WHERE type='table'", conn)['name'].values else pd.DataFrame(columns=['Contract', 'MaxMcap'])
+            # Rename 'token' to match database schema
+            mcaps_df = mcaps_df.rename(columns={'token': 'token', 'max_market_cap_usd': 'MaxMcap'})
+            # Keep only relevant columns
+            mcaps_df = mcaps_df[['token', 'MaxMcap']]
+            existing_mcaps = pd.read_sql_query("SELECT token, MaxMcap FROM mcaps", conn) if 'mcaps' in pd.read_sql_query("SELECT name FROM sqlite_master WHERE type='table'", conn)['name'].values else pd.DataFrame(columns=['token', 'MaxMcap'])
             if not existing_mcaps.empty:
                 mcaps_df = pd.concat([existing_mcaps, mcaps_df], ignore_index=True)
-            mcaps_df = mcaps_df.sort_values('max_market_cap_usd', ascending=False).drop_duplicates('token', keep='first')
-            mcaps_df = mcaps_df.rename(columns={'token': 'Contract', 'max_market_cap_usd': 'MaxMcap'})
+            mcaps_df = mcaps_df.sort_values('MaxMcap', ascending=False).drop_duplicates('token', keep='first')
             conn.execute("DROP TABLE IF EXISTS mcaps")
             mcaps_df.to_sql('mcaps', conn, if_exists='replace', index=False)
             print(f"Updated mcaps with {len(mcaps_df)} rows")
     
+    # Update processed files list
     with open(processed_file, 'w') as f:
         json.dump(processed_files, f)
     
+    # Create indexes with 'token'
     cursor = conn.cursor()
     existing_tables = pd.read_sql_query("SELECT name FROM sqlite_master WHERE type='table'", conn)['name'].tolist()
     for table in ['pf', 'fomo', 'bb', 'gm', 'mf', 'sm', 'pf10', 'fomo10', 'bb10', 'gm10', 'mf10', 'sm10']:
         if table in existing_tables:
-            # Get the table's column names
             cursor.execute(f"PRAGMA table_info({table})")
-            columns = [col[1] for col in cursor.fetchall()]  # Column names are in the second position
-            # Create Contract index if column exists
-            if 'Contract' in columns:
-                cursor.execute(f"CREATE INDEX IF NOT EXISTS idx_{table}_contract ON {table} (Contract)")
-            # Create Date index only if column exists
+            columns = [col[1] for col in cursor.fetchall()]
+            if 'token' in columns:
+                cursor.execute(f"CREATE INDEX IF NOT EXISTS idx_{table}_token ON {table} (token)")
             if 'Date' in columns:
                 cursor.execute(f"CREATE INDEX IF NOT EXISTS idx_{table}_date ON {table} (Date)")
     conn.commit()
