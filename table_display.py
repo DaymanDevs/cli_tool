@@ -2,6 +2,7 @@ from table_format import format_table_columns
 from table_utils import filter_table, generate_wallet_summary, search_contracts_in_pf, generate_wallet_config_from_rows
 from ui_utils import menu_selection, print_filters, get_terminal_height
 from wallet_config import load_wallets, apply_wallet_config, create_wallet_config, DEFAULT_CRITERIA
+from data_loader import load_mcaps_db
 from config import DATA_DIRECTORY
 import pandas as pd
 import platform
@@ -16,35 +17,58 @@ from colorama import Fore, Style
 
 colorama.init()
 
-def display_table(table_name, combined_tables, display_name, search_results=None):
-    if table_name not in combined_tables and search_results is None:
-        print(f"Table '{table_name}' not found.")
+def display_table(table_name, conn, display_name, search_results=None):
+    if conn is None:
+        print("Error: Database connection failed.")
         return
+    
+    mcaps_df = load_mcaps_db(conn)
     
     if search_results is not None and not search_results.empty:
         df = search_results.copy()
     else:
         is_top_table = "top" in display_name.lower()
         base_name = table_name.lower().replace(" top", "")
-        df = combined_tables[base_name].copy()
+        query = f"SELECT * FROM {base_name} ORDER BY Date DESC LIMIT 1000"
+        df = pd.read_sql_query(query, conn)
         df = df.rename(columns={"Funding Time": "FundTime", "Funding Source": "FundSource", "Dev Bal": "DevBal", "Has Links": "Links"})
         
         if is_top_table:
             top_key = f"{base_name}10"
-            top_df = combined_tables.get(top_key, pd.DataFrame())
+            top_df = pd.read_sql_query(f"SELECT Contract, MaxMcap, 'X\'s' FROM {top_key}", conn)
             if not top_df.empty:
-                df = df[df['Contract'].isin(top_df['Contract'])].merge(top_df[['Contract', 'MaxMcap', 'X\'s']], on='Contract', how='left', suffixes=('', '_top'))
-                df['MaxMcap'] = df['MaxMcap_top'].fillna(df['MaxMcap'])
-                df['X\'s'] = df['X\'s_top'].fillna(df['X\'s'])
+                df = df[df['Contract'].isin(top_df['Contract'])].merge(top_df, on='Contract', how='left', suffixes=('', '_top'))
+                if 'MaxMcap_top' in df.columns:
+                    df['MaxMcap'] = df['MaxMcap_top'].fillna(df['MaxMcap'])
+                if 'X\'s_top' in df.columns:
+                    df['X\'s'] = df['X\'s_top'].fillna(df['X\'s'])
                 df = df.drop(columns=[col for col in df.columns if col.endswith('_top')], errors='ignore')
+        else:
+            if not mcaps_df.empty:
+                df = df.merge(mcaps_df, on='Contract', how='left', suffixes=('', '_mcaps'))
+                if 'MaxMcap_mcaps' in df.columns:
+                    df['MaxMcap'] = df['MaxMcap'].fillna(df['MaxMcap_mcaps'])
+                    df['X\'s'] = df['X\'s'].fillna(df['MaxMcap'] / df['Mcap']).replace([float('inf'), -float('inf')], 0)
+                    df = df.drop(columns=['MaxMcap_mcaps'], errors='ignore')
+                else:
+                    df['MaxMcap'] = df.get('MaxMcap', pd.NA)
+                    df['X\'s'] = df.get('X\'s', 0)
+        
+        if base_name == 'pf':
+            df = df.sort_values(["Contract", "Date"], ascending=[True, True])
+            if 'Iteration' in df.columns:
+                df = df.drop(columns=["Iteration"])
+            df.insert(0, "Iteration", df.groupby("Contract").cumcount() + 1)
+            df = df.sort_values("Date", ascending=False)
     
     if 'Date' in df.columns and 'Time' in df.columns:
-        df['Date'] = pd.to_datetime(df['Date'] + ' ' + df['Time'], errors='coerce', dayfirst=True)
+        df['Date'] = pd.to_datetime(df['Date'] + ' ' + df['Time'], errors='coerce', dayfirst=True, format='%d/%m/%y %H:%M')
         df['Date'] = df['Date'].apply(lambda x: x.strftime('%d/%m/%y %H:%M') if pd.notna(x) else 'NaN')
         df = df.drop(columns=['Time'], errors='ignore')
     if 'Funding' in df.columns:
         df = df.drop(columns=['FundTime', 'FundSource'], errors='ignore')
     
+    total_rows = pd.read_sql_query(f"SELECT COUNT(*) as count FROM {base_name}", conn).iloc[0]['count']
     if '#' not in df.columns:
         df.insert(0, "#", range(1, len(df) + 1))
     original_df = df.copy()
@@ -59,13 +83,13 @@ def display_table(table_name, combined_tables, display_name, search_results=None
         middle_content = generate_wallet_summary(df, applied_configs.keys())
         if not middle_content:
             middle_content = ""
-        table_str_full = f"{print_filters(filters)}\nRow Count: {len(df)}\n=== Data for {display_name.upper()} ===\n" + \
+        table_str_full = f"{print_filters(filters)}\nRow Count: {total_rows} (Showing {len(df)})\n=== Data for {display_name.upper()} ===\n" + \
                         format_table_columns(df, applied_configs)
         if applied_configs:
             middle_content = f"'{', '.join(applied_configs.keys())}' applied\n" + middle_content
         
         terminal_height = get_terminal_height()
-        header_lines = len(f"{print_filters(filters)}\nRow Count: {len(df)}\n=== Data for {display_name.upper()} ===\n".split('\n'))
+        header_lines = len(f"{print_filters(filters)}\nRow Count: {total_rows} (Showing {len(df)})\n=== Data for {display_name.upper()} ===\n".split('\n'))
         middle_lines = len(middle_content.split('\n')) if middle_content else 0
         max_table_lines = terminal_height - header_lines - middle_lines - len(options) - 5
         table_lines = table_str_full.split('\n')
@@ -81,13 +105,13 @@ def display_table(table_name, combined_tables, display_name, search_results=None
                 continue
             if selected.lower() == "all":
                 contracts = df["Contract"].tolist()
-                search_contracts_in_pf(contracts, combined_tables, df)
+                search_contracts_in_pf(contracts, conn, df)
             else:
                 selected_nums = [int(i.strip()) for i in selected.split(',') if i.strip().isdigit()]
                 if selected_nums and all(num in df["#"].values for num in selected_nums):
                     filtered_df = df.loc[df["#"].isin(selected_nums)]
                     contracts = filtered_df["Contract"].tolist()
-                    search_contracts_in_pf(contracts, combined_tables, filtered_df)
+                    search_contracts_in_pf(contracts, conn, filtered_df)
                 else:
                     menu_selection(options, table_str, info_message="Invalid selection. Press any key to continue...", middle_content=middle_content)
                     input()
@@ -208,7 +232,11 @@ def display_table(table_name, combined_tables, display_name, search_results=None
     if search_results is not None and not search_results.empty and platform.system() == "Windows":
         os.system('cls')
 
-def search_tables_by_contract(combined_tables):
+def search_tables_by_contract(conn):
+    if conn is None:
+        print("Error: Database connection failed.")
+        return
+    
     contracts = []
     while True:
         contract = input("Enter contract address (or press Enter to finish): ").strip()
@@ -236,27 +264,33 @@ def search_tables_by_contract(combined_tables):
         return
     
     results = {}
+    mcaps_df = load_mcaps_db(conn)
     for feed in selected_feeds:
         try:
-            feed_df = combined_tables[feed.lower()].copy()
-            feed_df = feed_df[feed_df['Contract'].isin(contracts)]
+            query = f"SELECT * FROM {feed.lower()} WHERE Contract IN ({','.join(['?' for _ in contracts])})"
+            feed_df = pd.read_sql_query(query, conn, params=contracts)
             if not feed_df.empty:
                 if 'Date' in feed_df.columns and 'Time' in feed_df.columns:
-                    feed_df['Date'] = pd.to_datetime(feed_df['Date'] + ' ' + feed_df['Time'], errors='coerce', dayfirst=True)
+                    feed_df['Date'] = pd.to_datetime(feed_df['Date'] + ' ' + feed_df['Time'], errors='coerce', dayfirst=True, format='%d/%m/%y %H:%M')
                     feed_df['Date'] = feed_df['Date'].apply(lambda x: x.strftime('%d/%m/%y %H:%M') if pd.notna(x) else 'NaN')
                     feed_df = feed_df.drop(columns=['Time'], errors='ignore')
-                feed_df = feed_df.sort_values(["Date"], ascending=[True])
+                feed_df = feed_df.sort_values(["Date"], ascending=[True])  # Oldest first for iterations
                 if 'Iteration' in feed_df.columns:
                     feed_df = feed_df.drop(columns=["Iteration"])
                 feed_df.insert(0, "Iteration", feed_df.groupby("Contract").cumcount() + 1)
                 feed_df = feed_df.reset_index(drop=True)
                 if 'Funding' in feed_df.columns:
                     feed_df = feed_df.drop(columns=['FundTime', 'FundSource'], errors='ignore')
+                if not mcaps_df.empty:
+                    feed_df = feed_df.merge(mcaps_df, on='Contract', how='left', suffixes=('', '_mcaps'))
+                    feed_df['MaxMcap'] = feed_df['MaxMcap'].fillna(feed_df['MaxMcap_mcaps'])
+                    feed_df['X\'s'] = feed_df['X\'s'].fillna(feed_df['MaxMcap'] / feed_df['Mcap']).replace([float('inf'), -float('inf')], 0)
+                    feed_df = feed_df.drop(columns=['MaxMcap_mcaps'], errors='ignore')
                 if '#' not in feed_df.columns:
                     feed_df.insert(0, "#", range(1, len(feed_df) + 1))
                 results[feed] = feed_df
-        except KeyError:
-            print(f"Warning: Feed '{feed}' not found in combined_tables. Skipping...")
+        except Exception as e:
+            print(f"Warning: Error loading feed '{feed}': {e}")
             continue
     
     if not results:
@@ -270,9 +304,9 @@ def search_tables_by_contract(combined_tables):
     print("\n\n".join(combined_output))
     prompt = menu_selection(["Go to PF", "Go to SM", "Exit"], "Press Enter to go to PF, S for SM, ESC to exit:")
     if prompt == "Go to PF":
-        display_table("pf", combined_tables, "PF", results.get("PF", pd.DataFrame()))
+        display_table("pf", conn, "PF", results.get("PF", pd.DataFrame()))
     elif prompt == "Go to SM":
-        display_table("sm", combined_tables, "SM", results.get("SM", pd.DataFrame()))
+        display_table("sm", conn, "SM", results.get("SM", pd.DataFrame()))
     else:
         print("\nPress any key to continue...")
         if platform.system() == "Windows":
