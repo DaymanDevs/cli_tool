@@ -33,6 +33,11 @@ def display_table(table_name, conn, display_name, search_results=None):
         df = pd.read_sql_query(query, conn)
         df = df.rename(columns={"Funding Time": "FundTime", "Funding Source": "FundSource", "Dev Bal": "DevBal", "Has Links": "Links"})
         
+        # Combine Date and Time if both exist
+        if 'Date' in df.columns and 'Time' in df.columns:
+            df['Date'] = pd.to_datetime(df['Date'] + ' ' + df['Time'], errors='coerce', dayfirst=True, format='%d/%m/%y %H:%M')
+            df = df.drop(columns=['Time'], errors='ignore')
+        
         # Handle MCAPS and Top table data
         top_contracts = set()
         if is_top_table:
@@ -41,8 +46,9 @@ def display_table(table_name, conn, display_name, search_results=None):
             if not top_df.empty:
                 top_contracts = set(top_df['token'])
                 df = df.merge(top_df, on='token', how='left', suffixes=('', '_top'))
-                df['MaxMcap'] = df['MaxMcap_top'].fillna(df['MaxMcap'])
-                df = df.drop(columns=[col for col in df.columns if col.endswith('_top')], errors='ignore')
+                if 'MaxMcap_top' in df.columns:
+                    df['MaxMcap'] = df['MaxMcap_top'].fillna(df['MaxMcap'])
+                    df = df.drop(columns=[col for col in df.columns if col.endswith('_top')], errors='ignore')
         
         if not mcaps_df.empty:
             df = df.merge(mcaps_df, on='token', how='left', suffixes=('', '_mcaps'))
@@ -51,15 +57,14 @@ def display_table(table_name, conn, display_name, search_results=None):
                 df.loc[mask, 'MaxMcap'] = df.loc[mask, 'MaxMcap'].fillna(df['MaxMcap_mcaps'])
                 df = df.drop(columns=['MaxMcap_mcaps'], errors='ignore')
         
-        # Calculate X's dynamically for all rows
+        # Calculate X's dynamically
         df['X\'s'] = (df['MaxMcap'] / df['Mcap']).replace([float('inf'), -float('inf')], 0).fillna(0)
         
-        if 'Date' in df.columns and 'Time' in df.columns:
-            df['Date'] = pd.to_datetime(df['Date'] + ' ' + df['Time'], errors='coerce', dayfirst=True, format='%d/%m/%y %H:%M')
-            df['Date'] = df['Date'].apply(lambda x: x.strftime('%d/%m/%y %H:%M') if pd.notna(x) else 'NaN')
-            df = df.drop(columns=['Time'], errors='ignore')
         if 'Funding' in df.columns:
             df = df.drop(columns=['FundTime', 'FundSource'], errors='ignore')
+        
+        # Drop unwanted columns
+        df = df.drop(columns=['top_20_holders', 'token_age_days'], errors='ignore')
         
         if base_name == 'pf':
             df = df.sort_values(["token", "Date"], ascending=[True, True])
@@ -145,7 +150,7 @@ def display_table(table_name, conn, display_name, search_results=None):
                         input()
                         continue
                     numbered_wallets = [f"{i+1}: {name}" for i, name in enumerate(wallets.keys())] + ["All", "Back"]
-                    wallet_select = menu_selection(numbered_wallets, table_str, middle_content, prompt="Select wallets (comma-separated numbers, 'all', or 'back'): ")
+                    wallet_select = menu_selection(numbered_wallets, table_str, middle_content, prompt="Select wallets (comma-separated numbers, 'all', or 'back'): ", allow_input=True)
                     if wallet_select == "Back" or wallet_select is None:
                         continue
                     if wallet_select.lower() == "all":
@@ -163,10 +168,10 @@ def display_table(table_name, conn, display_name, search_results=None):
                         input()
                 
                 elif wallet_choice == "Create Wallet Config Using Filtered Table":
-                    name = menu_selection(wallet_options, table_str, middle_content, prompt="Enter name for new wallet config (or blank to cancel): ")
+                    name = menu_selection(wallet_options, table_str, middle_content, prompt="Enter name for new wallet config (or blank to cancel): ", allow_input=True)
                     if name is None or not name.strip():
                         continue
-                    selected = menu_selection(wallet_options, table_str, middle_content, prompt="Enter selection numbers (comma-separated, or 'all'): ")
+                    selected = menu_selection(wallet_options, table_str, middle_content, prompt="Enter selection numbers (comma-separated, or 'all'): ", allow_input=True)
                     if selected is None:
                         continue
                     if selected.lower() == "all":
@@ -218,7 +223,7 @@ def search_tables_by_contract(conn):
     
     feed_options = ["PF", "Fomo", "BB", "GM", "MF", "SM"]
     numbered_feeds = [f"{i+1}: {feed}" for i, feed in enumerate(feed_options)] + ["All", "Back"]
-    feed_choice = menu_selection(numbered_feeds, "", prompt="Select feeds to search (comma-separated numbers, or 'all'): ")
+    feed_choice = menu_selection(numbered_feeds, "", prompt="Select feeds to search (comma-separated numbers, or 'all'): ", allow_input=True)
     if feed_choice == "Back" or feed_choice is None:
         return
     
@@ -247,7 +252,6 @@ def search_tables_by_contract(conn):
             if not feed_df.empty:
                 if 'Date' in feed_df.columns and 'Time' in feed_df.columns:
                     feed_df['Date'] = pd.to_datetime(feed_df['Date'] + ' ' + feed_df['Time'], errors='coerce', dayfirst=True, format='%d/%m/%y %H:%M')
-                    feed_df['Date'] = feed_df['Date'].apply(lambda x: x.strftime('%d/%m/%y %H:%M') if pd.notna(x) else 'NaN')
                     feed_df = feed_df.drop(columns=['Time'], errors='ignore')
                 feed_df = feed_df.sort_values(["Date"], ascending=[True])
                 if 'Iteration' in feed_df.columns:
@@ -255,14 +259,13 @@ def search_tables_by_contract(conn):
                 feed_df.insert(0, "Iteration", feed_df.groupby("token").cumcount() + 1)
                 feed_df = feed_df.reset_index(drop=True)
                 if 'Funding' in feed_df.columns:
-                    feed_df = df.drop(columns=['FundTime', 'FundSource'], errors='ignore')
+                    feed_df = feed_df.drop(columns=['FundTime', 'FundSource'], errors='ignore')
                 if not mcaps_df.empty:
                     feed_df = feed_df.merge(mcaps_df, on='token', how='left', suffixes=('', '_mcaps'))
                     mask = ~feed_df['token'].isin(top_contracts)
                     if 'MaxMcap_mcaps' in feed_df.columns:
                         feed_df.loc[mask, 'MaxMcap'] = feed_df.loc[mask, 'MaxMcap'].fillna(feed_df['MaxMcap_mcaps'])
                         feed_df = feed_df.drop(columns=['MaxMcap_mcaps'], errors='ignore')
-                # Calculate X's dynamically for all rows
                 feed_df['X\'s'] = (feed_df['MaxMcap'] / feed_df['Mcap']).replace([float('inf'), -float('inf')], 0).fillna(0)
                 if '#' not in feed_df.columns:
                     feed_df.insert(0, "#", range(1, len(feed_df) + 1))

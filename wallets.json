@@ -530,5 +530,51 @@
             "max": 0.05
         },
         "Targeted Feed": "Fomo"
+    },
+    "Create New Wallet": {
+        "Mcap": {
+            "min": -Infinity,
+            "max": Infinity
+        },
+        "Liq": {
+            "min": -Infinity,
+            "max": Infinity
+        },
+        "AG": {
+            "min": -Infinity,
+            "max": Infinity
+        },
+        "Bundle": {
+            "max": Infinity
+        },
+        "Funding": {
+            "min": 0
+        },
+        "Dev%": {
+            "max": Infinity
+        },
+        "DevBal": {
+            "max": Infinity
+        },
+        "Links": null,
+        "F": {
+            "min": -Infinity,
+            "max": Infinity
+        },
+        "KYC": {
+            "min": -Infinity,
+            "max": Infinity
+        },
+        "Unq": {
+            "min": -Infinity,
+            "max": Infinity
+        },
+        "SM": {
+            "min": -Infinity,
+            "max": Infinity
+        },
+        "X's": {
+            "min": -Infinity
+        }
     }
 }

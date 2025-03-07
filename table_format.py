@@ -9,18 +9,20 @@ def format_table_columns(df, applied_configs):
     df = df.copy()
     col_widths = {}
     for col in df.columns:
-        if col == "Links":
+        if col == "token":
+            df[col] = df[col].apply(lambda x: f"{str(x)[:8]}..." if pd.notna(x) and len(str(x)) > 8 else str(x))
+        elif col == "Links":
             df[col] = df[col].apply(lambda x: "Yes" if pd.notna(x) and x else "No")
         elif col in ["Bundle", "Dev%"]:
             df[col] = df[col].apply(lambda x: f"{x*100:.2f}%" if pd.notna(x) else "NaN")
         elif col == "Date":
-            df[col] = df[col].apply(lambda x: str(x) if pd.notna(x) else "NaN")
+            df[col] = df[col].apply(lambda x: x.strftime('%d/%m/%y %H:%M') if pd.notna(x) and isinstance(x, pd.Timestamp) else "NaN")
         elif col == "X's":
             df[col] = df[col].apply(lambda x: f"{x:.2f}x" if pd.notna(x) else "NaN")
         elif col in ["Mcap", "Liq", "MaxMcap"]:
-            df[col] = df[col].apply(lambda x: f"{x:,.0f}" if pd.notna(x) else "NaN")
-        elif col in ["Dev Bal"]:
-            df[col] = df[col].apply(lambda x: f"{x:,.0f}" if pd.notna(x) else "NaN")
+            df[col] = df[col].apply(lambda x: f"${x:,.0f}" if pd.notna(x) else "NaN")
+        elif col in ["DevBal"]:
+            df[col] = df[col].apply(lambda x: f"${x:,.0f}" if pd.notna(x) else "NaN")
         else:
             df[col] = df[col].apply(lambda x: str(x) if pd.notna(x) else "NaN")
         col_widths[col] = max(len(str(col)), df[col].str.len().max())
