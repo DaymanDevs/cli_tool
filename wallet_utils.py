@@ -16,7 +16,7 @@ def format_wallet_table(wallets):
     ]
     col_widths = {"Criteria": len("Criteria")}
     for name in wallets.keys():
-        col_widths[name] = max(len(name), 10)  # Minimum width for readability
+        col_widths[name] = max(len(name), 10)
     
     rows = []
     for key in criteria_keys:
@@ -46,7 +46,7 @@ def format_wallet_table(wallets):
         rows.append(row)
     
     header_row = " | ".join(f"{Fore.CYAN}{header:<{col_widths[header]}}{Style.RESET_ALL}" for header in headers)
-    separator = "-" * (sum(col_widths.values()) + 3 * (len(headers) - 1))
+    separator = " | ".join("-" * col_widths[col] for col in headers)
     formatted_rows = [header_row, separator]
     for row in rows:
         formatted_row = " | ".join(f"{val:<{col_widths[headers[i]]}}" for i, val in enumerate(row))
@@ -58,7 +58,7 @@ def update_criteria(criteria, wallet_name, existing_names):
     options = list(criteria.keys()) + ["Save", "Save As", "Back"]
     while True:
         formatted_table = format_wallet_table({wallet_name: criteria})
-        choice = menu_selection(options, formatted_table, allow_input=True)
+        choice = menu_selection(options, formatted_table)
         if choice == "Back" or choice is None:
             return None
         elif choice == "Save":
@@ -99,7 +99,7 @@ def update_criteria(criteria, wallet_name, existing_names):
                 input()
         
         elif key in ["Bundle", "Dev%"]:
-            max_val = menu_selection(options, formatted_table, prompt=f"Enter maximum {key} % (or blank for no max): ", allow_input=True)
+            max_val = menu_selection(options, formatted_table, prompt=f"Enter max {key} % (or blank): ", allow_input=True)
             if max_val is None:
                 continue
             try:
@@ -110,7 +110,7 @@ def update_criteria(criteria, wallet_name, existing_names):
                 input()
         
         elif key == "Funding":
-            min_val = menu_selection(options, formatted_table, prompt="Enter minimum Funding time in hours (or blank for no min): ", allow_input=True)
+            min_val = menu_selection(options, formatted_table, prompt="Enter min Funding hours (or blank): ", allow_input=True)
             if min_val is None:
                 continue
             try:
@@ -121,7 +121,7 @@ def update_criteria(criteria, wallet_name, existing_names):
                 input()
         
         elif key == "X's":
-            min_val = menu_selection(options, formatted_table, prompt="Enter minimum X's (or blank for no min): ", allow_input=True)
+            min_val = menu_selection(options, formatted_table, prompt=f"Enter min X's (or blank): ", allow_input=True)
             if min_val is None:
                 continue
             try:

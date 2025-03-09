@@ -1,5 +1,5 @@
 import pandas as pd
-from data_loader import load_and_combine_csv
+import sqlite3
 from table_display import display_table, search_tables_by_contract
 from wallet_utils import format_wallet_table, update_criteria
 from wallet_config import load_wallets, save_wallets, duplicate_wallet_config
@@ -12,7 +12,7 @@ from colorama import Fore, Style
 
 colorama.init()
 
-def manage_wallets(combined_tables):
+def manage_wallets(conn):
     wallets = load_wallets()
     options = ["Create New Wallet", "Edit Wallet", "Duplicate Wallet", "Delete Wallet", "Back"] if wallets else ["Create New Wallet", "Back"]
     
@@ -23,7 +23,7 @@ def manage_wallets(combined_tables):
             break
         
         if choice == "Create New Wallet":
-            new_name = menu_selection(options, wallet_table, prompt="Enter new wallet name (or blank to cancel): ")
+            new_name = menu_selection(options, wallet_table, prompt="Enter new wallet name (or blank to cancel): ", allow_input=True)
             if new_name and new_name not in wallets:
                 from wallet_config import DEFAULT_CRITERIA
                 new_criteria = DEFAULT_CRITERIA.copy()
@@ -47,7 +47,7 @@ def manage_wallets(combined_tables):
             wallet_options = list(wallets.keys()) + ["Back"]
             dup_choice = menu_selection(wallet_options, wallet_table)
             if dup_choice != "Back" and dup_choice is not None:
-                new_name = menu_selection(wallet_options, wallet_table, prompt="Enter new wallet name (or blank to cancel): ")
+                new_name = menu_selection(wallet_options, wallet_table, prompt="Enter new wallet name (or blank to cancel): ", allow_input=True)
                 if new_name and new_name not in wallets:
                     duplicate_wallet_config(dup_choice, new_name)
                     wallets = load_wallets()
@@ -67,12 +67,26 @@ def main():
     else:
         os.system('clear')
     
-    main_menu = ["Feeds", "Wallets", "Search by contract", "Exit"]
-    feed_options = ["PF", "Fomo", "BB", "GM", "MF", "SM", "PF Top", "Fomo Top", "BB Top", "GM Top", "MF Top", "SM Top", "Back"]
-    combined_tables = load_and_combine_csv(DATA_DIRECTORY)
-    if combined_tables is None:
-        print("Error: Failed to load data. Run init_db.py first.")
+    db_path = os.path.join(DATA_DIRECTORY, 'data.db')
+    if not os.path.exists(db_path):
+        print("Error: Database not found. Run init_db.py first.")
         return
+    conn = sqlite3.connect(db_path)
+    
+    cursor = conn.cursor()
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'mcaps'")
+    feed_tables = [row[0] for row in cursor.fetchall()]
+    if not feed_tables:
+        print("Error: No feed tables found in database. Run init_db.py with data.")
+        conn.close()
+        return
+    
+    regular_feeds = [t for t in feed_tables if not t.endswith('10')]
+    top_feeds = [t for t in feed_tables if t.endswith('10')]
+    
+    main_menu = ["Feeds", "Wallets", "Search by contract", "Exit"]
+    feed_options = [table.replace('_', ' ').title() for table in regular_feeds] + \
+                   [table.replace('_', ' ').title().replace('10', ' Top') for table in top_feeds] + ["Back"]
     
     while True:
         choice = menu_selection(main_menu, "", prompt="=== MAIN MENU ===")
@@ -82,19 +96,22 @@ def main():
         if choice == "Feeds":
             feed_choice = menu_selection(feed_options, "", prompt="=== FEEDS ===")
             if feed_choice != "Back" and feed_choice is not None:
-                internal_key = feed_choice.lower().replace(" top", "")
-                display_table(internal_key, combined_tables, feed_choice)
+                internal_key = feed_choice.lower().replace(' ', '_').replace('top', '10')
+                display_name = feed_choice
+                display_table(internal_key, conn, display_name)
         
         elif choice == "Wallets":
-            manage_wallets(combined_tables)
+            manage_wallets(conn)
         
         elif choice == "Search by contract":
-            search_tables_by_contract(combined_tables)
+            search_tables_by_contract(conn)
         
         if platform.system() == "Windows":
             os.system('cls')
         else:
             os.system('clear')
+    
+    conn.close()
 
 if __name__ == "__main__":
     main()
